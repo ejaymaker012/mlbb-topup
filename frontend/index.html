@@ -90,76 +90,78 @@
     </table>
   </div>
 </div>
-  <form id="topupForm">
-    <input type="text" id="mlbbId" placeholder="MLBB ID" required>
-    <input type="text" id="mlbbServer" placeholder="Server" required>
-    <input type="number" id="diamonds" placeholder="Diamonds" required>
-    <input type="number" id="amount" placeholder="Amount" required>
-    <input type="text" id="method" placeholder="Payment Method" required>
-    <button type="submit">Top Up</button>
-  </form>
+<script>
+  let selectedDiamonds = 0;
+  let selectedAmount = 0;
+  let transactionCounter = 1;
 
-  <div id="history"></div>
+  function selectPackage(element, diamonds, amount) {
+    document.querySelectorAll('.package-card').forEach(card => card.classList.remove('selected'));
+    element.classList.add('selected');
+    selectedDiamonds = diamonds;
+    selectedAmount = amount;
+  }
 
-  <script>
-    // --- Functions ---
-    async function login(email, password) {
-      const response = await fetch('https://topupwebproject-production.up.railway.app/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await response.json();
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-        return data;
-      }
+  async function checkout() {
+    if (!selectedDiamonds) {
+      alert("Please select a diamond package!");
+      return;
     }
+    const mlbbId = document.getElementById("mlbbId").value;
+    const mlbbServer = document.getElementById("mlbbServer").value;
+    const method = document.getElementById("paymentMethod").value;
 
-    async function createTopUp(diamonds, amount, method, mlbbId, mlbbServer) {
-      const token = localStorage.getItem('token');
-      const response = await fetch('https://topupwebproject-production.up.railway.app/topup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': token
-        },
-        body: JSON.stringify({ diamonds, amount, method, mlbbId, mlbbServer })
-      });
-      return await response.json();
-    }
+    // Show success instantly
+    document.getElementById("statusMsg").innerText = 
+      `✅ Payment Successful! ${selectedDiamonds} Diamonds purchased for ₱${selectedAmount} via ${method}.`;
 
-    async function getHistory() {
-      const token = localStorage.getItem('token');
-      const response = await fetch('https://topupwebproject-production.up.railway.app/history', {
-        method: 'GET',
-        headers: { 'Authorization': token }
-      });
-      return await response.json();
-    }
+    // Create transaction object
+    const transaction = {
+      id: transactionCounter++,
+      diamonds: selectedDiamonds,
+      amount: selectedAmount,
+      method,
+      status: "Success",
+      date: new Date().toLocaleString()
+    };
 
-    async function checkHealth() {
-      const response = await fetch('https://topupwebproject-production.up.railway.app/health');
-      return await response.json();
-    }
+    // Save transaction to localStorage
+    let history = JSON.parse(localStorage.getItem("history")) || [];
+    history.push(transaction);
+    localStorage.setItem("history", JSON.stringify(history));
 
-    // --- Top-up form handler ---
-    document.getElementById('topupForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const mlbbId = document.getElementById('mlbbId').value;
-      const mlbbServer = document.getElementById('mlbbServer').value;
-      const diamonds = document.getElementById('diamonds').value;
-      const amount = document.getElementById('amount').value;
-      const method = document.getElementById('method').value;
+    // Refresh table
+    renderHistory();
 
-      const result = await createTopUp(diamonds, amount, method, mlbbId, mlbbServer);
-      alert('Top-up result: ' + JSON.stringify(result));
-
-      // Refresh history
-      const history = await getHistory();
-      document.getElementById('history').innerText = JSON.stringify(history, null, 2);
+    // Optional: send to backend
+    await fetch("https://topupwebproject-production.up.railway.app/topup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": localStorage.getItem("token") },
+      body: JSON.stringify({ diamonds: selectedDiamonds, amount: selectedAmount, method, mlbbId, mlbbServer })
     });
-  </script>
+  }
+
+  function renderHistory() {
+    const historyTable = document.getElementById("history");
+    historyTable.innerHTML = "";
+    const history = JSON.parse(localStorage.getItem("history")) || [];
+    history.forEach(t => {
+      historyTable.innerHTML += `<tr>
+        <td>${t.id}</td>
+        <td>${t.diamonds}</td>
+        <td>₱${t.amount}</td>
+        <td>${t.method}</td>
+        <td>${t.status}</td>
+        <td>${t.date}</td>
+      </tr>`;
+    });
+    // Keep counter in sync
+    transactionCounter = history.length + 1;
+  }
+
+  // Load history on page load
+  window.onload = renderHistory;
+</script>
 
  
 </body>
