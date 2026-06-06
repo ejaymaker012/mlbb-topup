@@ -10,10 +10,10 @@ app.use(bodyParser.json());
 const SECRET = "mlbbsecretkey";
 
 const db = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: 'password', // change to your MySQL password
-  database: 'mlbb_topup'
+  host: process.env.MYSQLHOST,
+  user: process.env.MYSQLUSER,
+  password: process.env.MYSQLPASSWORD,
+  database: process.env.MYSQLDATABASE
 });
 
 // Register
@@ -72,23 +72,6 @@ app.get('/admin/topups', auth, (req, res) => {
   });
 });
 
-app.listen(3000, () => console.log("MLBB Top-Up Server running on port 3000"));
-app.post('/topup', auth, (req, res) => {
-  const { diamonds, amount, method, mlbbId, mlbbServer } = req.body;
-  db.query("INSERT INTO TopUps (user_id, mlbb_id, mlbb_server, diamonds, amount, method, status) VALUES (?, ?, ?, ?, ?, ?, 'pending')",
-    [req.userId, mlbbId, mlbbServer, diamonds, amount, method],
-    (err, result) => {
-      if (err) return res.status(500).send(err);
-      res.send({ message: "Top-up request created", topupId: result.insertId });
-    });
-});
-// Get transaction history for logged-in user
-app.get('/history', auth, (req, res) => {
-  db.query("SELECT * FROM TopUps WHERE user_id=? ORDER BY date DESC", [req.userId], (err, results) => {
-    if (err) return res.status(500).send(err);
-    res.send(results);
-  });
-});
 // Get transaction history for logged-in user
 app.get('/history', auth, (req, res) => {
   db.query(
@@ -100,4 +83,6 @@ app.get('/history', auth, (req, res) => {
     }
   );
 });
+
+app.listen(process.env.PORT || 3000, () => console.log(`MLBB Top-Up Server running on port ${process.env.PORT || 3000}`));
 
