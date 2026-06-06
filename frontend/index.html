@@ -129,7 +129,7 @@
     historyTable.innerHTML += row;
 
     // Optional: send to backend
-    await fetch("http://localhost:3000/topup", {
+    await fetch("http://mlbbtopupproject.railway.internal", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": localStorage.getItem("token") },
       body: JSON.stringify({ diamonds: selectedDiamonds, amount: selectedAmount, method, mlbbId, mlbbServer })
