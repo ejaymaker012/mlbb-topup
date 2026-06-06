@@ -91,51 +91,90 @@
   </div>
 </div>
 
-<script>
-  let selectedDiamonds = 0;
-  let selectedAmount = 0;
-  let transactionCounter = 1; // simple counter for demo
+  <!-- Example login form -->
+  <form id="loginForm">
+    <input type="email" id="email" placeholder="Email" required>
+    <input type="password" id="password" placeholder="Password" required>
+    <button type="submit">Login</button>
+  </form>
 
-  function selectPackage(element, diamonds, amount) {
-    document.querySelectorAll('.package-card').forEach(card => card.classList.remove('selected'));
-    element.classList.add('selected');
-    selectedDiamonds = diamonds;
-    selectedAmount = amount;
-  }
+  <!-- Example top-up form -->
+  <form id="topupForm">
+    <input type="text" id="mlbbId" placeholder="MLBB ID" required>
+    <input type="text" id="mlbbServer" placeholder="Server" required>
+    <input type="number" id="diamonds" placeholder="Diamonds" required>
+    <input type="number" id="amount" placeholder="Amount" required>
+    <input type="text" id="method" placeholder="Payment Method" required>
+    <button type="submit">Top Up</button>
+  </form>
 
-  async function checkout() {
-    if (!selectedDiamonds) {
-      alert("Please select a diamond package!");
-      return;
+  <div id="history"></div>
+
+  <script>
+    // --- Functions you provided ---
+    async function login(email, password) {
+      const response = await fetch('https://topupwebproject-production.up.railway.app/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await response.json();
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+        return data;
+      }
     }
-    const mlbbId = document.getElementById("mlbbId").value;
-    const mlbbServer = document.getElementById("mlbbServer").value;
-    const method = document.getElementById("paymentMethod").value;
 
-    // Show success instantly
-    document.getElementById("statusMsg").innerText = 
-      `✅ Payment Successful! ${selectedDiamonds} Diamonds purchased for ₱${selectedAmount} via ${method}.`;
+    async function createTopUp(diamonds, amount, method, mlbbId, mlbbServer) {
+      const token = localStorage.getItem('token');
+      const response = await fetch('https://topupwebproject-production.up.railway.app/topup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token
+        },
+        body: JSON.stringify({ diamonds, amount, method, mlbbId, mlbbServer })
+      });
+      return await response.json();
+    }
 
-    // Add to transaction history table
-    const historyTable = document.getElementById("history");
-    const row = `<tr>
-      <td>${transactionCounter++}</td>
-      <td>${selectedDiamonds}</td>
-      <td>₱${selectedAmount}</td>
-      <td>${method}</td>
-      <td>Success</td>
-      <td>${new Date().toLocaleString()}</td>
-    </tr>`;
-    historyTable.innerHTML += row;
+    async function getHistory() {
+      const token = localStorage.getItem('token');
+      const response = await fetch('https://topupwebproject-production.up.railway.app/history', {
+        method: 'GET',
+        headers: { 'Authorization': token }
+      });
+      return await response.json();
+    }
 
-    // Optional: send to backend
-    await fetch("topupwebproject-production.up.railway.app", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": localStorage.getItem("token") },
-      body: JSON.stringify({ diamonds: selectedDiamonds, amount: selectedAmount, method, mlbbId, mlbbServer })
+    async function checkHealth() {
+      const response = await fetch('https://topupwebproject-production.up.railway.app/health');
+      return await response.json();
+    }
+
+    // --- Example usage with forms ---
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const result = await login(email, password);
+      alert('Logged in: ' + JSON.stringify(result));
     });
-  }
 
-</script>
+    document.getElementById('topupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const mlbbId = document.getElementById('mlbbId').value;
+      const mlbbServer = document.getElementById('mlbbServer').value;
+      const diamonds = document.getElementById('diamonds').value;
+      const amount = document.getElementById('amount').value;
+      const method = document.getElementById('method').value;
+      const result = await createTopUp(diamonds, amount, method, mlbbId, mlbbServer);
+      alert('Top-up result: ' + JSON.stringify(result));
+
+      // Refresh history
+      const history = await getHistory();
+      document.getElementById('history').innerText = JSON.stringify(history, null, 2);
+    });
+  </script>
 </body>
 </html>
