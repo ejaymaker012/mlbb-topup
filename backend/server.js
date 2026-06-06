@@ -83,7 +83,6 @@ app.get('/history', auth, (req, res) => {
     }
   );
 });
-
+app.use(cors({ origin: "mlbb-topup-ejaymaker-s-projects.vercel.app" }));
 app.listen(process.env.PORT || 3000, () => console.log(`MLBB Top-Up Server running on port ${process.env.PORT || 3000}`));
 
-app.use(cors({ origin: "https://mlbb-topup.vercel.app" }));
