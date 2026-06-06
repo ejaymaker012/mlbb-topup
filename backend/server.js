@@ -7,7 +7,7 @@ const path = require("path");
 
 const app = express();
 app.use(cors({
-  origin: "https://mlbb-topup.vercel.app",
+  origin: "mlbb-topup-ejaymaker-s-projects.vercel.app",
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
