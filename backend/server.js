@@ -2,6 +2,8 @@ const express = require("express");
 const mysql = require("mysql2");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const fs = require("fs");
+const path = require("path");
 
 const app = express();
 app.use(cors({
@@ -24,6 +26,53 @@ const DB_CONFIG = {
 
 const RETRY_INTERVAL_MS = 5000;
 const MAX_RETRIES = 12; // ~1 minute of retries
+
+function initializeDatabase(connection) {
+  const sqlFile = path.join(__dirname, "mmlbb_topup.sql");
+
+  fs.readFile(sqlFile, "utf8", (err, sql) => {
+    if (err) {
+      console.error("[DB] Failed to read schema file:", err.message);
+      return;
+    }
+
+    // Strip the bare CREATE DATABASE / USE statements — the Railway MySQL
+    // service already provides a dedicated database via MYSQLDATABASE, so we
+    // only need to ensure the tables exist inside it.
+    const sanitized = sql
+      .replace(/CREATE\s+DATABASE\s+[^;]+;/gi, "")
+      .replace(/USE\s+[^;]+;/gi, "");
+
+    // Add IF NOT EXISTS guards so re-runs on reconnect are safe
+    const guarded = sanitized
+      .replace(/CREATE\s+TABLE\s+(?!IF NOT EXISTS)/gi, "CREATE TABLE IF NOT EXISTS ");
+
+    // Split on semicolons and execute each non-empty statement in sequence
+    const statements = guarded
+      .split(";")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
+    let index = 0;
+    function runNext() {
+      if (index >= statements.length) {
+        console.log("[DB] Schema initialisation complete.");
+        return;
+      }
+      const stmt = statements[index++];
+      connection.query(stmt, (err) => {
+        if (err) {
+          console.error(`[DB] Schema statement failed: ${stmt}\n  Error: ${err.message}`);
+          // Continue with remaining statements even if one fails
+        }
+        runNext();
+      });
+    }
+
+    console.log("[DB] Running schema initialisation from mmlbb_topup.sql…");
+    runNext();
+  });
+}
 
 function connectDatabase(attempt = 1) {
   console.log(
@@ -49,6 +98,9 @@ function connectDatabase(attempt = 1) {
 
     console.log("[DB] Connected successfully.");
     db = connection;
+
+    // Initialise schema before the app starts serving traffic
+    initializeDatabase(connection);
 
     // Handle unexpected disconnects and attempt to reconnect
     connection.on("error", (err) => {
@@ -95,7 +147,10 @@ app.post("/topup", auth, requireDb, (req, res) => {
     "INSERT INTO TopUps (user_id, mlbb_id, mlbb_server, diamonds, amount, method, status) VALUES (?, ?, ?, ?, ?, ?, 'success')",
     [req.userId, mlbbId, mlbbServer, diamonds, amount, method],
     (err, result) => {
-      if (err) return res.status(500).send(err);
+      if (err) {
+        console.error("[TopUp] INSERT failed:", err.message, err);
+        return res.status(500).send(err);
+      }
       res.send({ message: "Top-up successful", topupId: result.insertId });
     }
   );
@@ -107,7 +162,10 @@ app.get("/history", auth, requireDb, (req, res) => {
     "SELECT * FROM TopUps WHERE user_id=? ORDER BY date DESC",
     [req.userId],
     (err, results) => {
-      if (err) return res.status(500).send(err);
+      if (err) {
+        console.error("[History] SELECT failed:", err.message, err);
+        return res.status(500).send(err);
+      }
       res.send(results);
     }
   );
