@@ -13,6 +13,9 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Serve static files from public folder
+app.use(express.static(path.join(__dirname, 'public')));
+
 // db is set once connectDatabase() succeeds
 let db = null;
 
@@ -177,3 +180,4 @@ app.listen(PORT, () => {
   // Start connecting to the database only after the server is up
   connectDatabase();
 });
+
